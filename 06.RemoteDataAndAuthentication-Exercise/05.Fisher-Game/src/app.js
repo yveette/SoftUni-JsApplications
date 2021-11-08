@@ -1,24 +1,29 @@
+// console.log('TODO:// Implement Home functionality');
+
 let userData = null;
+// let token = userData.token;
 
 window.addEventListener('DOMContentLoaded', () => {
+    loadData();
     userData = JSON.parse(sessionStorage.getItem('userData'));
+
     if (userData != null) {
         document.getElementById('guest').style.display = 'none';
         document.querySelector('#addForm .add').disabled = false;
+        // welcome user
+        document.querySelector('.email').innerHTML = `Welcome, <span>${userData.email}</span>`;
 
     } else {
         document.getElementById('user').style.display = 'none';
     }
 
     document.querySelector('.load').addEventListener('click', loadData);
-
     document.getElementById('addForm').addEventListener('submit', onCreateSubmit);
-
-    document.getElementById('logout').addEventListener('click', onLogout);
-
     document.getElementById('catches').addEventListener('click', btnHandler);
+    document.getElementById('logout').addEventListener('click', onLogout);
 })
 
+//check update or delete button
 function btnHandler(event) {
     if (event.target.textContent == 'Update') {
         updateCatch(event);
@@ -29,14 +34,15 @@ function btnHandler(event) {
 
 async function updateCatch(event) {
     const [angler, weight, species, location, bait, captureTime] = event.target.parentNode.querySelectorAll('input');
-    const id = event.target.parentElement.dataset.id;
-    const token = sessionStorage.getItem('accessToken');
+
+    const id = event.target.dataset.id;
+    // const token = userData.token;
 
     const response = await fetch('http://localhost:3030/data/catches/' + id, {
         method: 'put',
         headers: {
             'Content-Type': 'application/json',
-            'X-Authorization': token
+            'X-Authorization': userData.token
         },
         body: JSON.stringify({
             angler: angler.value, weight: weight.value, species: species.value,
@@ -50,15 +56,15 @@ async function updateCatch(event) {
     }
 }
 
-
 async function deleteCatch(event) {
-    const id = event.target.parentElement.dataset.id;
-    const token = sessionStorage.getItem('accessToken');
+    const id = event.target.dataset.id;
+    // const token = userData.token;
 
     const response = await fetch('http://localhost:3030/data/catches/' + id, {
         method: 'delete',
-        headers: { 'X-Authorization': token }
+        headers: { 'X-Authorization': userData.token }
     });
+
     if (response.ok == false) {
         const error = await response.json();
         return alert(error.message);
@@ -66,35 +72,15 @@ async function deleteCatch(event) {
     loadData();
 }
 
-async function onLogout() {
-    try {
-        const res = fetch('http://localhost:3030/users/logout', {
-            method: 'get',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Authorization': sessionStorage.getItem('accessToken')
-            }
-        });
-
-        if (res.ok != true) {
-            const error = await res.json();
-            throw new Error(error.message);
-        }
-
-        sessionStorage.removeItem('accessToken');
-        window.location = 'index.html';
-    } catch (err) {
-        alert(err.message);
-    }
-}
-
 async function onCreateSubmit(event) {
     event.preventDefault();
     if (!userData) {
-        window.location = '/login.html';
+        window.location = './login.html';
         return;
     }
+
     const formData = new FormData(event.target);
+
     const data = [...formData.entries()].reduce((a, [k, v]) => Object.assign(a, { [k]: v }), {})
 
     try {
@@ -116,19 +102,21 @@ async function onCreateSubmit(event) {
             throw new Error(error.message);
         }
 
-        event.target.reset();
         loadData();
+        event.target.reset();
     } catch (err) {
         alert(err.message);
     }
 }
 
 async function loadData() {
+    const btnLoad =document.querySelector('.load');
+    btnLoad.textContent = 'Loading...';
     const res = await fetch('http://localhost:3030/data/catches');
     const data = await res.json();
 
-    document.getElementById('catches')
-        .replaceChildren(...data.map(createPreview));
+    document.getElementById('catches').replaceChildren(...data.map(createPreview));
+    btnLoad.textContent = "Load";
 }
 
 function createPreview(item) {
@@ -152,4 +140,32 @@ function createPreview(item) {
     <button class="delete" data-id="${item._id}" ${!isOwner ? 'disabled' : ''}>Delete</button>`;
 
     return element;
+}
+
+async function onLogout(event) {
+    event.preventDefault();
+    try {
+        const res = await fetch('http://localhost:3030/users/logout', {
+            method: 'get',
+            headers: {
+                'X-Authorization': userData.token
+            }
+        });
+
+        if (res.ok != true) {
+            const error = await res.json();
+            throw new Error(error.message);
+        }
+
+        document.querySelector('.email').innerHTML = `Welcome, <span>guest</span>`;
+        userData = null;
+        document.getElementById('guest').style.display = 'block';
+        document.getElementById('user').style.display = 'none';
+        document.querySelector('#addForm .add').disabled = true;
+
+        loadData();
+        window.location = '/index.html';
+    } catch (err) {
+        alert(err.message);
+    }
 }
